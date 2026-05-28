@@ -1,0 +1,20 @@
+{
+  "name": "zol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ZOL — multi-tenant AI voice agent platform. Voice core skeleton.",
+  "scripts": {
+    "dev": "pnpm --filter @zol/web dev",
+    "build": "pnpm --filter @zol/web build",
+    "start": "pnpm --filter @zol/web start",
+    "lint": "pnpm --filter @zol/web lint",
+    "typecheck": "pnpm --filter @zol/web typecheck",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "functions:serve": "supabase functions serve"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
