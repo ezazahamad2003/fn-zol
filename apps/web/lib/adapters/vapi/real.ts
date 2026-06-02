@@ -1,6 +1,7 @@
 import type { VapiAdapter, VapiAssistantConfig, VapiVoice, ProvisionedTenantVapi } from "@/lib/adapters/types";
 import { env } from "@/lib/env";
 import { buildVapiTools } from "@/lib/adapters/vapi/tools";
+import { fetchWithRetry } from "@/lib/http";
 
 // Real VAPI integration. Docs: https://docs.vapi.ai/api-reference
 //
@@ -15,14 +16,14 @@ const VAPI_BASE = "https://api.vapi.ai";
 async function vapiFetch(path: string, init: RequestInit): Promise<any> {
   const key = env.vapiApiKey();
   if (!key) throw new Error("VAPI_API_KEY is not set");
-  const res = await fetch(`${VAPI_BASE}${path}`, {
+  const res = await fetchWithRetry(`${VAPI_BASE}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${key}`,
       "content-type": "application/json",
       ...(init.headers ?? {}),
     },
-  });
+  }, { timeoutMs: 20_000, retries: 2 });
   const text = await res.text();
   const body = text ? safeJson(text) : null;
   if (!res.ok) {

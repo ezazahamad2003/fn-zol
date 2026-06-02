@@ -13,6 +13,7 @@ export default function SignupPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +36,17 @@ export default function SignupPage() {
     }
   }
 
+  async function resend() {
+    setError(null);
+    const { error } = await supabaseBrowser().auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+    });
+    if (error) { setError(error.message); return; }
+    setResent(true);
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-muted/40">
       <Card className="w-full max-w-sm">
@@ -44,9 +56,19 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           {confirmSent ? (
-            <p className="text-sm text-muted-foreground">
-              Almost there — confirm your email at <b>{email}</b>, then you'll land on setup.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Almost there — confirm your email at <b>{email}</b>, then you&apos;ll land on setup.
+              </p>
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              {resent ? (
+                <p className="text-xs text-emerald-700">Confirmation email resent.</p>
+              ) : (
+                <Button type="button" variant="outline" className="w-full" onClick={resend}>
+                  Resend confirmation email
+                </Button>
+              )}
+            </div>
           ) : (
             <form onSubmit={signUp} className="space-y-3">
               <div className="space-y-1">

@@ -1,5 +1,7 @@
 import type { ModelAdapter, ExtractedTask } from "@/lib/adapters/types";
 import { env } from "@/lib/env";
+import { fetchWithRetry } from "@/lib/http";
+import { logError } from "@/lib/log";
 
 // Real extractor — calls OpenAI (gpt-4o-mini: fast + cheap) once per call after
 // hangup to pull out concrete follow-up tasks. Runs in the background, so we
@@ -25,7 +27,7 @@ export const modelReal: ModelAdapter = {
     ].filter(Boolean).join("\n\n");
 
     try {
-      const res = await fetch(OPENAI_URL, {
+      const res = await fetchWithRetry(OPENAI_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
         body: JSON.stringify({
@@ -37,12 +39,13 @@ export const modelReal: ModelAdapter = {
             { role: "user", content: userContent },
           ],
         }),
-      });
+      }, { timeoutMs: 20_000, retries: 2 });
       if (!res.ok) return [];
       const data = await res.json();
       const text: string = data?.choices?.[0]?.message?.content ?? "";
       return parseTasks(text);
-    } catch {
+    } catch (err) {
+      logError("model.extractTasks", err);
       return [];
     }
   },

@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       callId:   callRow.id,
       name:     tc.function.name,
       input:    args,
+      vapiToolCallId: tc.id,
     });
     return result.status === "ok"
       ? { toolCallId: tc.id, result: result.output }

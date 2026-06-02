@@ -1,6 +1,7 @@
 import type { CalendarAdapter, CalendarSlot, CalendarEvent } from "@/lib/adapters/types";
 import { getValidAccessToken } from "@/lib/google/oauth";
 import { DEFAULT_BOOKING_CONFIG, isSlotWithinHours } from "@/lib/booking";
+import { fetchWithRetry } from "@/lib/http";
 
 // Real Google Calendar adapter. Uses the per-tenant OAuth token (see
 // lib/google/oauth.ts). findOpenSlots derives free windows from the freeBusy
@@ -12,10 +13,10 @@ const CAL_BASE = "https://www.googleapis.com/calendar/v3";
 
 async function googleFetch(tenantId: string, path: string, init: RequestInit): Promise<any> {
   const token = await getValidAccessToken(tenantId);
-  const res = await fetch(`${CAL_BASE}${path}`, {
+  const res = await fetchWithRetry(`${CAL_BASE}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json", ...(init.headers ?? {}) },
-  });
+  }, { timeoutMs: 15_000, retries: 2 });
   if (!res.ok) throw new Error(`Google Calendar ${init.method} ${path} failed (${res.status}): ${await res.text()}`);
   return res.json();
 }

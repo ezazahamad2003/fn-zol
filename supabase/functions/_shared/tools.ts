@@ -195,12 +195,24 @@ export async function runTool(args: {
   callId: string;
   name: string;
   input: Record<string, unknown>;
+  vapiToolCallId?: string;
 }): Promise<{ status: "ok" | "error"; output: unknown; error?: string; duration_ms: number }> {
+  // Idempotency: if VAPI re-sends a tool call we've already handled, return the
+  // stored result instead of running the side effect (e.g. booking) again.
+  if (args.vapiToolCallId) {
+    const { data: prior } = await args.supabase
+      .from("tool_calls").select("output, status, error")
+      .eq("vapi_tool_call_id", args.vapiToolCallId).maybeSingle();
+    if (prior) {
+      return { status: prior.status as "ok" | "error", output: prior.output, error: prior.error ?? undefined, duration_ms: 0 };
+    }
+  }
+
   const handler = tools[args.name as ToolName];
   const started = Date.now();
   if (!handler) {
     await args.supabase.from("tool_calls").insert({
-      tenant_id: args.tenantId, call_id: args.callId,
+      tenant_id: args.tenantId, call_id: args.callId, vapi_tool_call_id: args.vapiToolCallId ?? null,
       tool_name: args.name, input: args.input, output: null,
       duration_ms: 0, status: "error", error: `Unknown tool: ${args.name}`,
     });
@@ -210,7 +222,7 @@ export async function runTool(args: {
     const output = await handler({ supabase: args.supabase, tenantId: args.tenantId, callId: args.callId }, args.input);
     const duration_ms = Date.now() - started;
     await args.supabase.from("tool_calls").insert({
-      tenant_id: args.tenantId, call_id: args.callId,
+      tenant_id: args.tenantId, call_id: args.callId, vapi_tool_call_id: args.vapiToolCallId ?? null,
       tool_name: args.name, input: args.input, output: output as Record<string, unknown>,
       duration_ms, status: "ok",
     });
@@ -219,7 +231,7 @@ export async function runTool(args: {
     const duration_ms = Date.now() - started;
     const message = err instanceof Error ? err.message : String(err);
     await args.supabase.from("tool_calls").insert({
-      tenant_id: args.tenantId, call_id: args.callId,
+      tenant_id: args.tenantId, call_id: args.callId, vapi_tool_call_id: args.vapiToolCallId ?? null,
       tool_name: args.name, input: args.input, output: null,
       duration_ms, status: "error", error: message,
     });

@@ -30,6 +30,7 @@ export async function getValidAccessToken(tenantId: string): Promise<string> {
       refresh_token: data.refresh_token as string,
       grant_type: "refresh_token",
     }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`Google token refresh failed: ${await res.text()}`);
   const refreshed = await res.json();

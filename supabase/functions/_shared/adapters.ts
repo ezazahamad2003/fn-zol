@@ -11,6 +11,7 @@ async function googleFetch(tenantId: string, path: string, init: RequestInit): P
   const res = await fetch(`${CAL_BASE}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json", ...(init.headers ?? {}) },
+    signal: AbortSignal.timeout(10_000), // caller is on the line — fail fast
   });
   if (!res.ok) throw new Error(`Google Calendar ${init.method} ${path} failed (${res.status}): ${await res.text()}`);
   return res.json();

@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { fetchWithRetry } from "@/lib/http";
 
 // Per-tenant Google OAuth. The business owner connects their Google account;
 // we store the refresh token (service-role only) and mint access tokens on
@@ -45,7 +46,7 @@ type TokenResponse = {
 
 export async function exchangeCode(code: string): Promise<TokenResponse> {
   const g = env.google();
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetchWithRetry(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -55,7 +56,7 @@ export async function exchangeCode(code: string): Promise<TokenResponse> {
       redirect_uri: g.redirectUri,
       grant_type: "authorization_code",
     }),
-  });
+  }, { timeoutMs: 15_000, retries: 1 });
   if (!res.ok) throw new Error(`Google token exchange failed: ${await res.text()}`);
   return res.json();
 }
@@ -115,7 +116,7 @@ export async function getValidAccessToken(tenantId: string): Promise<string> {
 
   // Refresh.
   const g = env.google();
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetchWithRetry(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -124,7 +125,7 @@ export async function getValidAccessToken(tenantId: string): Promise<string> {
       refresh_token: data.refresh_token,
       grant_type: "refresh_token",
     }),
-  });
+  }, { timeoutMs: 15_000, retries: 1 });
   if (!res.ok) throw new Error(`Google token refresh failed: ${await res.text()}`);
   const refreshed: TokenResponse = await res.json();
 

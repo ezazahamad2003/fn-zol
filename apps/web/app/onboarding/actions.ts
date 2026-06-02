@@ -1,12 +1,26 @@
 "use server";
 
+import { z } from "zod";
 import { cookies } from "next/headers";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { adapters } from "@/lib/adapters";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant-context";
 import { voiceForPreset, DEFAULT_VOICE_PRESET_ID, DEFAULT_MODEL } from "@/lib/voice-presets";
 import { composeSystemPrompt } from "@/lib/agent-prompt";
+import { logError } from "@/lib/log";
 import type { Tenant } from "@/lib/db/types";
+
+// Cap businesses per user — each one provisions a paid VAPI number, so this is
+// an abuse/cost guard, not a product limit (raise as needed).
+const MAX_BUSINESSES_PER_USER = 20;
+
+const OnboardSchema = z.object({
+  name: z.string().trim().min(1, "Business name is required.").max(80),
+  systemPrompt: z.string().trim().min(1, "Add some instructions for the agent.").max(8000),
+  firstMessage: z.string().trim().max(500),
+  voicePreset: z.string().max(60),
+  model: z.string().max(40),
+});
 
 export type OnboardResult =
   | { ok: true; tenantId: string; phoneNumber: string | null }
@@ -30,12 +44,23 @@ export async function createBusiness(form: {
   voicePreset: string;
   model: string;
 }): Promise<OnboardResult> {
-  const name = form.name.trim();
-  if (!name) return { ok: false, error: "Business name is required." };
+  const parsed = OnboardSchema.safeParse(form);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  const name = parsed.data.name;
+  form = parsed.data;
 
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
+
+  // Cost/abuse guard: limit how many businesses one account can provision.
+  const { count } = await supabase
+    .from("tenant_members").select("*", { count: "exact", head: true }).eq("user_id", user.id);
+  if ((count ?? 0) >= MAX_BUSINESSES_PER_USER) {
+    return { ok: false, error: "You've reached the maximum number of businesses for this account." };
+  }
 
   const presetId = form.voicePreset || DEFAULT_VOICE_PRESET_ID;
   const voice = voiceForPreset(presetId);
@@ -71,6 +96,7 @@ export async function createBusiness(form: {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logError("onboarding.provision", err, { tenantId: tenant.id, name });
     // Tenant exists but provisioning failed — surface it; the user can retry
     // provisioning from settings. Don't leave them stranded with no business.
     return { ok: false, error: `Business created, but provisioning the phone number failed: ${message}` };

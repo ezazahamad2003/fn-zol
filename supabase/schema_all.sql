@@ -1,7 +1,7 @@
 -- =============================================================
 -- ZOL — full schema (paste into Supabase Dashboard -> SQL Editor)
--- Idempotent-ish: safe on a fresh project. For an EXISTING project,
--- only the trailing ALTER ... ADD COLUMN IF NOT EXISTS lines are new.
+-- Safe on a fresh project. For an EXISTING project, only the
+-- trailing ALTER ... ADD COLUMN IF NOT EXISTS lines are new.
 -- =============================================================
 
 -- >>> supabase/migrations/20260528000000_initial_schema.sql
@@ -311,4 +311,17 @@ alter table public.tenants add column if not exists routing_rules jsonb not null
 -- Exclude a staff member from being offered for bookings without deactivating
 -- them entirely (they can still receive routed calls/messages).
 alter table public.staff add column if not exists is_bookable boolean not null default true;
+
+-- >>> supabase/migrations/20260602030000_tool_call_idempotency.sql
+-- =============================================================================
+-- Idempotency for in-call tool invocations. VAPI may retry a tool webhook;
+-- without a dedup key that could double-book an appointment. We store VAPI's
+-- per-invocation tool-call id and short-circuit if we've already handled it.
+-- =============================================================================
+
+alter table public.tool_calls add column if not exists vapi_tool_call_id text;
+
+create unique index if not exists tool_calls_vapi_tool_call_id_uniq
+  on public.tool_calls(vapi_tool_call_id)
+  where vapi_tool_call_id is not null;
 

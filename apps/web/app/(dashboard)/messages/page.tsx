@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui/primitives";
 import { relativeTime } from "@/lib/utils";
@@ -11,7 +11,7 @@ export default async function MessagesPage() {
   const tenant = await getActiveTenant();
   if (!tenant) return <div className="p-6"><EmptyState title="No tenant." /></div>;
 
-  const supabase = supabaseAdmin();
+  const supabase = supabaseServer();
   const [{ data: msgs }, { data: staff }] = await Promise.all([
     supabase.from("messages").select("*").eq("tenant_id", tenant.id).order("created_at", { ascending: false }),
     supabase.from("staff")   .select("*").eq("tenant_id", tenant.id),

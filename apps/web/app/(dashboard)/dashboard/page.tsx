@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui/primitives";
 import { callDuration, relativeTime } from "@/lib/utils";
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const supabase = supabaseAdmin();
+  const supabase = supabaseServer();
   const { data: calls } = await supabase
     .from("calls")
     .select("*")

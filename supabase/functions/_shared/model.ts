@@ -35,6 +35,7 @@ export async function extractTasks(transcript: string, summary: string | null): 
           { role: "user", content: userContent },
         ],
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) return regexFallback(transcript, summary);
     const data = await res.json();

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { Transcript } from "@/components/transcript";
 import { RunTrace } from "@/components/run-trace";
@@ -10,7 +10,9 @@ import type { Appointment, Call, Message, Task, ToolCall } from "@/lib/db/types"
 export const dynamic = "force-dynamic";
 
 export default async function CallDetailPage({ params }: { params: { id: string } }) {
-  const supabase = supabaseAdmin();
+  // Authed client → RLS ensures a user can only read calls for tenants they
+  // belong to (a call id from another tenant simply returns null → notFound).
+  const supabase = supabaseServer();
   const { data: call } = await supabase.from("calls").select("*").eq("id", params.id).maybeSingle();
   if (!call) notFound();
   const c = call as Call;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui/primitives";
 import { normalizeBookingConfig } from "@/lib/booking";
@@ -16,7 +16,7 @@ export default async function AppointmentsPage() {
   if (!tenant) return <div className="p-6"><EmptyState title="No business." /></div>;
 
   const tz = normalizeBookingConfig(tenant.booking_config).timezone;
-  const supabase = supabaseAdmin();
+  const supabase = supabaseServer();
   const [{ data: appts }, { data: staff }] = await Promise.all([
     supabase.from("appointments").select("*").eq("tenant_id", tenant.id).order("start_at", { ascending: true }),
     supabase.from("staff").select("id, name").eq("tenant_id", tenant.id),

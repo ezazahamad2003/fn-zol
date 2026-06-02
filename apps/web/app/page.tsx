@@ -114,6 +114,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>© {new Date().getFullYear()} ZOL · AI voice agents for business</div>
           <div className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <Link href="/login" className="hover:text-foreground">Sign in</Link>
             <Link href="/signup" className="hover:text-foreground">Get started</Link>
           </div>
