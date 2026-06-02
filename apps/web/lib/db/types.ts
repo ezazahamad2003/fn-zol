@@ -10,6 +10,7 @@ export type Tenant = {
   vapi_phone_id: string | null;
   model: string;
   system_prompt: string | null;
+  first_message: string | null;
   voice_config: Record<string, unknown>;
   created_at: string;
 };

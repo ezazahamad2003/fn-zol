@@ -4,11 +4,21 @@ import type { Tenant } from "@/lib/db/types";
 // VAPI
 // ----------------------------------------------------------------------------
 
+// How the agent sounds. provider/voiceId map directly onto VAPI's voice block;
+// `model` is the provider's TTS model (e.g. eleven_flash_v2_5, sonic-2).
+export type VapiVoice = {
+  provider: string;   // "11labs" | "cartesia" | ...
+  voiceId: string;
+  model?: string;
+  speed?: number;
+};
+
 export type VapiAssistantConfig = {
   name: string;
-  model: string;
+  model: string;          // in-call LLM, e.g. "gpt-4o"
   systemPrompt: string;
-  voice: Record<string, unknown>;
+  firstMessage?: string;
+  voice: VapiVoice;
 };
 
 export type ProvisionedTenantVapi = {

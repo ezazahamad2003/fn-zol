@@ -9,9 +9,12 @@
 import { handlePreflight, corsHeaders } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { resolveTenant, upsertCall } from "../_shared/tenant.ts";
+import { extractTasks } from "../_shared/model.ts";
+import { verifyVapiSecret } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   const pre = handlePreflight(req); if (pre) return pre;
+  if (!verifyVapiSecret(req)) return json({ error: "unauthorized" }, 401);
 
   let payload: Record<string, unknown>;
   try {
@@ -57,9 +60,8 @@ Deno.serve(async (req) => {
   const { error: updErr } = await supabase.from("calls").update(update).eq("id", callRow.id);
   if (updErr) return json({ error: "update_failed", detail: updErr.message }, 500);
 
-  // ----- task extraction (stub heuristic in stub mode) -----
-  // Keep this inline + simple so the edge function stays self-contained.
-  const tasks = extractTasks(transcript ?? "", summary);
+  // ----- task extraction (Claude, with a regex fallback) -----
+  const tasks = await extractTasks(transcript ?? "", summary);
   if (tasks.length > 0) {
     await supabase.from("tasks").insert(tasks.map((t) => ({
       tenant_id:   tenant.id,
@@ -71,25 +73,6 @@ Deno.serve(async (req) => {
 
   return json({ ok: true, call_id: callRow.id, tasks_created: tasks.length });
 });
-
-// Cheap heuristic — mirrors apps/web/lib/adapters/model/stub.ts.
-function extractTasks(transcript: string, summary: string | null): { title: string; description?: string }[] {
-  const trigger = /\b(send|follow up|call back|email|confirm|prepare|ship|schedule|quote|invoice)\b/i;
-  const out: { title: string; description?: string }[] = [];
-  for (const raw of transcript.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (trigger.test(line) && line.length < 220) {
-      const title = line.replace(/^(Agent|Caller):\s*/i, "").slice(0, 100);
-      if (title.length > 12) out.push({ title });
-    }
-    if (out.length >= 3) break;
-  }
-  if (out.length === 0 && summary) {
-    out.push({ title: `Follow up: ${summary.slice(0, 80)}` });
-  }
-  return out;
-}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

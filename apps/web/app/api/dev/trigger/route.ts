@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   const result = await runTool({
     supabase,
     tenantId: body.tenantId,
-    callId,
+    callId: callId!,
     name: body.tool as ToolName,
     input: body.args ?? {},
   });

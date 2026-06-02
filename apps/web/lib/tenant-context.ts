@@ -1,13 +1,36 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { supabaseServer } from "@/lib/supabase/server";
+import { ACTIVE_TENANT_COOKIE } from "@/lib/constants";
 import type { Tenant } from "@/lib/db/types";
 
-// For the stub-mode dashboard we don't have real auth wired yet, so we default
-// to the first tenant in the DB (FNS in the seed). Once Supabase Auth is in
-// front of every page this should become: "active tenant for the current user".
-export async function getActiveTenant(): Promise<Tenant | null> {
-  const supabase = supabaseAdmin();
+export { ACTIVE_TENANT_COOKIE };
+
+export type TenantMembership = { tenant: Tenant; role: string };
+
+// All tenants the current user belongs to (RLS scopes this to auth.uid()).
+export async function getMemberships(): Promise<TenantMembership[]> {
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
-    .from("tenants").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle();
+    .from("tenant_members")
+    .select("role, tenant:tenants(*)")
+    .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data as Tenant) ?? null;
+
+  return (data ?? [])
+    .map((row) => ({ role: row.role as string, tenant: row.tenant as unknown as Tenant }))
+    .filter((m) => Boolean(m.tenant));
+}
+
+// The tenant the user is currently acting as: the one named by the
+// `active_tenant` cookie if they're still a member, otherwise their first.
+export async function getActiveTenant(): Promise<Tenant | null> {
+  const memberships = await getMemberships();
+  if (memberships.length === 0) return null;
+
+  const preferred = cookies().get(ACTIVE_TENANT_COOKIE)?.value;
+  const match = preferred && memberships.find((m) => m.tenant.id === preferred);
+  return (match ? match.tenant : memberships[0].tenant) ?? null;
 }

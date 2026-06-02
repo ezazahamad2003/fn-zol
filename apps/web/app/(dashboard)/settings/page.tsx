@@ -1,87 +1,88 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, EmptyState } from "@/components/ui/primitives";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Button, EmptyState } from "@/components/ui/primitives";
 import { DevTriggerPanel } from "@/components/dev-trigger-panel";
+import { AgentForm } from "@/components/settings/agent-form";
+import { StaffManager } from "@/components/settings/staff-manager";
+import { getConnection, googleConfigured } from "@/lib/google/oauth";
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_FIRST_MESSAGE, DEFAULT_VOICE_PRESET_ID } from "@/lib/voice-presets";
 import type { Staff } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: { google?: string } }) {
   const tenant = await getActiveTenant();
-  if (!tenant) return <div className="p-6"><EmptyState title="No tenant." /></div>;
+  if (!tenant) return <div className="p-6"><EmptyState title="No business." /></div>;
 
-  const supabase = supabaseAdmin();
+  const supabase = supabaseServer();
   const { data: staff } = await supabase.from("staff").select("*").eq("tenant_id", tenant.id).order("role");
   const list = (staff as Staff[] | null ?? []);
+  const voicePreset = (tenant.voice_config?.preset as string | undefined) ?? DEFAULT_VOICE_PRESET_ID;
+
+  const gConfigured = googleConfigured();
+  const gConn = gConfigured ? await getConnection(tenant.id) : null;
+  const gFlash = searchParams?.google;
 
   return (
     <div className="p-6 space-y-4 max-w-5xl">
       <header>
         <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-xs text-muted-foreground">Tenant config, voice agent personality, staff routing.</p>
+        <p className="text-xs text-muted-foreground">Your agent's personality, voice, and staff routing.</p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle>VAPI assistant</CardTitle>
-          <CardDescription>Per-tenant credentials — provisioned at onboarding, stored on the tenants row.</CardDescription>
+          <CardTitle>Phone line</CardTitle>
+          <CardDescription>Provisioned at onboarding. Callers reach your agent here.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <KV k="Tenant name"        v={tenant.name} />
-          <KV k="Tenant slug"        v={tenant.slug} />
-          <KV k="Model"              v={tenant.model} />
-          <KV k="Inbound number"     v={tenant.vapi_phone_number ?? "(not provisioned)"} />
-          <KV k="VAPI assistant id"  v={tenant.vapi_assistant_id ?? "(not provisioned)"} />
-          <KV k="VAPI phone id"      v={tenant.vapi_phone_id ?? "(not provisioned)"} />
+          <KV k="Business"          v={tenant.name} />
+          <KV k="Inbound number"    v={tenant.vapi_phone_number ?? "(not provisioned)"} />
+          <KV k="VAPI assistant id" v={tenant.vapi_assistant_id ?? "(not provisioned)"} />
+          <KV k="VAPI phone id"     v={tenant.vapi_phone_id ?? "(not provisioned)"} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>System prompt</CardTitle>
-          <CardDescription>The agent's personality. Pushed to VAPI on update (see VapiAdapter.updateAssistant).</CardDescription>
+          <CardTitle>Google Calendar</CardTitle>
+          <CardDescription>Connect Google so the agent can check availability and book appointments.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <pre className="text-xs whitespace-pre-wrap font-mono border border-border rounded-md p-3 bg-muted/40 max-h-[360px] overflow-auto">
-            {tenant.system_prompt ?? "(empty)"}
-          </pre>
-          {/* TODO: replace with an editable form — on submit, update tenants.system_prompt
-              and call adapters.vapi.updateAssistant(tenant.vapi_assistant_id, { systemPrompt }). */}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Staff &amp; routing</CardTitle>
-          <CardDescription>Targets for route_call, capture_message routing, and book_appointment.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {list.length === 0 ? <EmptyState title="No staff yet." /> : (
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="text-left font-medium px-4 py-2">Name</th>
-                  <th className="text-left font-medium px-4 py-2">Role</th>
-                  <th className="text-left font-medium px-4 py-2">Phone</th>
-                  <th className="text-left font-medium px-4 py-2">Calendar</th>
-                  <th className="text-left font-medium px-4 py-2">Active</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {list.map((s) => (
-                  <tr key={s.id}>
-                    <td className="px-4 py-2">{s.name}</td>
-                    <td className="px-4 py-2 capitalize">{s.role}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{s.phone ?? "—"}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{s.google_calendar_id ?? "—"}</td>
-                    <td className="px-4 py-2">{s.is_active ? <Badge variant="success">on</Badge> : <Badge variant="muted">off</Badge>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <CardContent className="space-y-3 text-sm">
+          {!gConfigured ? (
+            <p className="text-xs text-muted-foreground">
+              Calendar isn't configured on this deployment yet. Add the <code>GOOGLE_*</code> environment
+              variables to enable it.
+            </p>
+          ) : gConn ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="success">connected</Badge>
+              <span className="text-muted-foreground">{gConn.google_email ?? "Google account linked"}</span>
+              <a href="/api/google/connect"><Button size="sm" variant="outline">Reconnect</Button></a>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <a href="/api/google/connect"><Button size="sm">Connect Google Calendar</Button></a>
+              {gFlash === "error" && <span className="text-xs text-red-600">Connection failed — try again.</span>}
+              {gFlash === "forbidden" && <span className="text-xs text-red-600">Not allowed for this business.</span>}
+            </div>
           )}
+          {gFlash === "connected" && <p className="text-xs text-emerald-700">Google Calendar connected.</p>}
+          <p className="text-[11px] text-muted-foreground">
+            Add each staff member's calendar id (their Google email) under Staff &amp; routing below.
+          </p>
         </CardContent>
       </Card>
+
+      <AgentForm
+        systemPrompt={tenant.system_prompt ?? DEFAULT_SYSTEM_PROMPT}
+        firstMessage={tenant.first_message ?? DEFAULT_FIRST_MESSAGE}
+        voicePreset={voicePreset}
+        model={tenant.model}
+        hasAssistant={Boolean(tenant.vapi_assistant_id)}
+      />
+
+      <StaffManager staff={list} />
 
       <DevTriggerPanel tenantId={tenant.id} staff={list.map((s) => ({ id: s.id, name: s.name, role: s.role }))} />
     </div>

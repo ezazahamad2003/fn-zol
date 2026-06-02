@@ -43,12 +43,25 @@ For the business owner, ZOL turns inbound calls into outcomes — not voicemail.
 
 ## 3. Where it is today
 
-The full skeleton runs end-to-end on seeded FNS demo data — dashboard, call
-detail, run trace, tasks, messages, settings. Every external service (the
-voice platform, the AI model, Google Calendar) is **stubbed** behind a clean
-swap point, so we can demo the product flow today without paying for any
-provider. There is **no live phone number yet** and **no real calendar
-booking** — those are the next milestone.
+ZOL is now a **self-serve product**, not just a demo. A business owner can sign
+up, name their business, write the agent's personality and pick a voice, and
+click once to get a **live phone number** — all in-app. The real integrations
+are wired behind the same `USE_STUBS` swap:
+
+- **Auth** (Supabase) — signup/login, magic links, route protection, per-user
+  tenant resolution + business switcher.
+- **Self-serve onboarding** — creates the business and provisions a VAPI
+  assistant + phone number in one step.
+- **Real VAPI adapter** — low-latency, human-sounding stack (Deepgram Flux +
+  GPT-4o + ElevenLabs/Cartesia voice), with the 5 tools and webhooks wired.
+- **Continuously-editable settings** — prompt, greeting, voice, model, and
+  staff; saving pushes live to VAPI.
+- **Real after-call extraction** (Claude) and **Google Calendar** (per-business
+  OAuth) — calendar stays dormant until Google creds are added.
+
+With `USE_STUBS=true` the whole flow still runs locally with no provider spend.
+Going live = set the keys (`VAPI_API_KEY`, Supabase, Anthropic, optional
+Google), flip `USE_STUBS=false`, deploy the edge functions. See `DEPLOY.md`.
 
 ---
 

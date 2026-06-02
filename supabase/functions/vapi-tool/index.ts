@@ -23,9 +23,11 @@ import { handlePreflight, corsHeaders } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { resolveTenant, upsertCall } from "../_shared/tenant.ts";
 import { runTool } from "../_shared/tools.ts";
+import { verifyVapiSecret } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   const pre = handlePreflight(req); if (pre) return pre;
+  if (!verifyVapiSecret(req)) return json({ error: "unauthorized" }, 401);
 
   let payload: Record<string, unknown>;
   try {
