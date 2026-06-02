@@ -1,41 +1,44 @@
 // Deno twin of apps/web/lib/adapters/model/real.ts — extracts follow-up tasks
-// from a finished call via Claude. Fails soft (returns []) so a model hiccup
+// from a finished call via OpenAI. Fails soft (returns []) so a model hiccup
 // never blocks persisting the call.
 
 export type ExtractedTask = { title: string; description?: string };
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5-20251001";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const MODEL = "gpt-4o-mini";
 
 const SYSTEM = `You extract concrete follow-up tasks from a phone call between a business's AI receptionist and a caller.
 Return ONLY tasks that require a human to do something after the call.
-Do not invent tasks. If nothing needs following up, return an empty list.`;
+Do not invent tasks. If nothing needs following up, return an empty list.
+Respond with a JSON object: {"tasks":[{"title":"...","description":"..."}]}. title is required and short.`;
 
 export async function extractTasks(transcript: string, summary: string | null): Promise<ExtractedTask[]> {
-  const key = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+  const key = Deno.env.get("OPENAI_API_KEY") ?? "";
   if (!key) return regexFallback(transcript, summary);
   if (!transcript && !summary) return [];
 
   const userContent = [
     summary ? `Call summary:\n${summary}` : null,
     transcript ? `Transcript:\n${transcript.slice(0, 12000)}` : null,
-    `\nReturn a JSON object: {"tasks":[{"title":"...","description":"..."}]}. title is required and short.`,
   ].filter(Boolean).join("\n\n");
 
   try {
-    const res = await fetch(ANTHROPIC_URL, {
+    const res = await fetch(OPENAI_URL, {
       method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1024,
-        system: SYSTEM,
-        messages: [{ role: "user", content: userContent }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: userContent },
+        ],
       }),
     });
     if (!res.ok) return regexFallback(transcript, summary);
     const data = await res.json();
-    const text: string = data?.content?.[0]?.text ?? "";
+    const text: string = data?.choices?.[0]?.message?.content ?? "";
     const parsed = parseTasks(text);
     return parsed.length > 0 ? parsed : regexFallback(transcript, summary);
   } catch {

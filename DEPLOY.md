@@ -24,7 +24,7 @@ supabase functions deploy vapi-tool vapi-end-of-call
 supabase secrets set \
   USE_STUBS=false \
   VAPI_WEBHOOK_SECRET=<same value as the web app> \
-  ANTHROPIC_API_KEY=<key> \
+  OPENAI_API_KEY=<key> \
   GOOGLE_CLIENT_ID=<id> GOOGLE_CLIENT_SECRET=<secret>
 # SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 ```
