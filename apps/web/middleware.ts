@@ -10,10 +10,15 @@ export async function middleware(req: NextRequest) {
   // Response we can write refreshed auth cookies onto.
   let res = NextResponse.next({ request: { headers: req.headers } });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-    {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  // If Supabase isn't configured yet (e.g. env not set on a fresh deploy), don't
+  // crash the whole site — just serve pages without auth gating.
+  if (!url || !anonKey) return res;
+
+  let user = null;
+  try {
+    const supabase = createServerClient(url, anonKey, {
       cookies: {
         get(name: string) {
           return req.cookies.get(name)?.value;
@@ -25,11 +30,13 @@ export async function middleware(req: NextRequest) {
           res.cookies.set({ name, value: "", ...options });
         },
       },
-    },
-  );
-
-  // Refreshes the session and keeps cookies fresh on every request.
-  const { data: { user } } = await supabase.auth.getUser();
+    });
+    // Refreshes the session and keeps cookies fresh on every request.
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    // Bad config / transient auth error — fail open rather than 500.
+    return res;
+  }
 
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
