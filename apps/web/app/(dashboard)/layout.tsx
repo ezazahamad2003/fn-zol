@@ -1,6 +1,8 @@
 import { Nav } from "@/components/nav";
 import { getActiveTenant } from "@/lib/tenant-context";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getActiveTenant();
   const name = tenant?.name ?? "(no tenant)";
