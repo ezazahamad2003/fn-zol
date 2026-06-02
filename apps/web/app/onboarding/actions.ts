@@ -5,6 +5,7 @@ import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { adapters } from "@/lib/adapters";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant-context";
 import { voiceForPreset, DEFAULT_VOICE_PRESET_ID, DEFAULT_MODEL } from "@/lib/voice-presets";
+import { composeSystemPrompt } from "@/lib/agent-prompt";
 import type { Tenant } from "@/lib/db/types";
 
 export type OnboardResult =
@@ -59,7 +60,12 @@ export async function createBusiness(form: {
     provisioned = await adapters.vapi.provisionTenant({
       name,
       model,
-      systemPrompt: form.systemPrompt,
+      // Compose base personality + default booking hours (no routing rules yet).
+      systemPrompt: composeSystemPrompt({
+        systemPrompt: form.systemPrompt,
+        bookingConfig: {},
+        routingRules: [],
+      }),
       firstMessage: form.firstMessage,
       voice,
     });

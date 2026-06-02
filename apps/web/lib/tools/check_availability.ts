@@ -3,6 +3,7 @@ import type {
   CheckAvailabilityOutput,
   ToolHandler,
 } from "@/lib/tools/types";
+import { normalizeBookingConfig } from "@/lib/booking";
 
 export const checkAvailability: ToolHandler<CheckAvailabilityInput, CheckAvailabilityOutput> = async (
   ctx,
@@ -14,11 +15,17 @@ export const checkAvailability: ToolHandler<CheckAvailabilityInput, CheckAvailab
     throw new Error("check_availability: invalid date_range");
   }
 
+  // Load the business's booking hours (slot length + open windows).
+  const { data: tenant } = await ctx.supabase
+    .from("tenants").select("booking_config").eq("id", ctx.tenantId).maybeSingle();
+  const cfg = normalizeBookingConfig(tenant?.booking_config);
+
   let q = ctx.supabase
     .from("staff")
     .select("id, name, google_calendar_id, role")
     .eq("tenant_id", ctx.tenantId)
     .eq("is_active", true)
+    .eq("is_bookable", true)
     .not("google_calendar_id", "is", null);
   if (input.staff_role) q = q.eq("role", input.staff_role);
   if (input.staff_id)   q = q.eq("id", input.staff_id);
@@ -34,7 +41,8 @@ export const checkAvailability: ToolHandler<CheckAvailabilityInput, CheckAvailab
     staffCalendarIds: staff.map((s) => ({ staff_id: s.id, calendar_id: s.google_calendar_id! })),
     rangeStart,
     rangeEnd,
-    slotMinutes: input.slot_minutes ?? 15,
+    slotMinutes: cfg.slotMinutes,
+    businessHours: cfg,
   });
 
   const nameById = new Map(staff.map((s) => [s.id, s.name as string]));

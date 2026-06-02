@@ -4,7 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Butto
 import { DevTriggerPanel } from "@/components/dev-trigger-panel";
 import { AgentForm } from "@/components/settings/agent-form";
 import { StaffManager } from "@/components/settings/staff-manager";
+import { BookingForm } from "@/components/settings/booking-form";
+import { RoutingForm } from "@/components/settings/routing-form";
 import { getConnection, googleConfigured } from "@/lib/google/oauth";
+import { normalizeBookingConfig } from "@/lib/booking";
+import { normalizeRoutingRules } from "@/lib/agent-prompt";
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_FIRST_MESSAGE, DEFAULT_VOICE_PRESET_ID } from "@/lib/voice-presets";
 import type { Staff } from "@/lib/db/types";
 
@@ -18,6 +22,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
   const { data: staff } = await supabase.from("staff").select("*").eq("tenant_id", tenant.id).order("role");
   const list = (staff as Staff[] | null ?? []);
   const voicePreset = (tenant.voice_config?.preset as string | undefined) ?? DEFAULT_VOICE_PRESET_ID;
+  const bookingConfig = normalizeBookingConfig(tenant.booking_config);
+  const routingRules = normalizeRoutingRules(tenant.routing_rules);
+  const roles = Array.from(new Set(list.map((s) => s.role).filter(Boolean)));
 
   const gConfigured = googleConfigured();
   const gConn = gConfigured ? await getConnection(tenant.id) : null;
@@ -83,6 +90,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
       />
 
       <StaffManager staff={list} />
+
+      <BookingForm config={bookingConfig} />
+
+      <RoutingForm rules={routingRules} roles={roles} />
 
       <DevTriggerPanel tenantId={tenant.id} staff={list.map((s) => ({ id: s.id, name: s.name, role: s.role }))} />
     </div>

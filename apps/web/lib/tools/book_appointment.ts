@@ -14,6 +14,7 @@ export const bookAppointment: ToolHandler<BookAppointmentInput, BookAppointmentO
     .select("id, name, google_calendar_id")
     .eq("tenant_id", ctx.tenantId)
     .eq("is_active", true)
+    .eq("is_bookable", true)
     .not("google_calendar_id", "is", null)
     .limit(1);
   if (input.staff_id)        staffQuery = staffQuery.eq("id", input.staff_id);

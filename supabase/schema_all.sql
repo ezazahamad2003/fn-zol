@@ -1,9 +1,10 @@
 -- =============================================================
 -- ZOL — full schema (paste into Supabase Dashboard -> SQL Editor)
--- Applies: base multi-tenant schema + RLS, agent fields + onboarding
--- RPC, and google_credentials. Safe to run once on a fresh project.
+-- Idempotent-ish: safe on a fresh project. For an EXISTING project,
+-- only the trailing ALTER ... ADD COLUMN IF NOT EXISTS lines are new.
 -- =============================================================
 
+-- >>> supabase/migrations/20260528000000_initial_schema.sql
 -- =============================================================================
 -- ZOL — initial schema
 -- Multi-tenant from day one. Every domain table carries tenant_id and is
@@ -219,6 +220,7 @@ create policy "tasks: tenant write"         on public.tasks          for all    
 create policy "appointments: tenant read"   on public.appointments   for select using (public.is_tenant_member(tenant_id));
 create policy "messages: tenant read"       on public.messages       for select using (public.is_tenant_member(tenant_id));
 
+-- >>> supabase/migrations/20260602000000_agent_fields_and_onboarding.sql
 -- =============================================================================
 -- Agent greeting field + self-serve onboarding RPC.
 -- =============================================================================
@@ -268,6 +270,7 @@ $$;
 
 grant execute on function public.create_tenant_for_current_user(text, text, text, text, text, jsonb) to authenticated;
 
+-- >>> supabase/migrations/20260602010000_google_credentials.sql
 -- =============================================================================
 -- Per-tenant Google OAuth credentials for Calendar access.
 -- One connected Google account per business; staff calendar ids (on the staff
@@ -290,3 +293,22 @@ create table public.google_credentials (
 
 alter table public.google_credentials enable row level security;
 -- No policies on purpose: service role bypasses RLS; everyone else is denied.
+
+-- >>> supabase/migrations/20260602020000_booking_and_routing.sql
+-- =============================================================================
+-- Self-serve config: booking hours + routing rules + per-staff bookable flag.
+-- =============================================================================
+
+-- Per-business booking window + slot length. Shape:
+--   { "timezone": "America/New_York", "slotMinutes": 30,
+--     "days": { "mon": {"open": true, "start": "09:00", "end": "17:00"}, ... } }
+alter table public.tenants add column if not exists booking_config jsonb not null default '{}'::jsonb;
+
+-- Ordered intent -> role rules the agent uses to transfer/route. Shape:
+--   [ { "intent": "billing or payment questions", "role": "billing" }, ... ]
+alter table public.tenants add column if not exists routing_rules jsonb not null default '[]'::jsonb;
+
+-- Exclude a staff member from being offered for bookings without deactivating
+-- them entirely (they can still receive routed calls/messages).
+alter table public.staff add column if not exists is_bookable boolean not null default true;
+

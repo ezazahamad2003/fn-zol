@@ -1,4 +1,5 @@
 import type { Tenant } from "@/lib/db/types";
+import type { BookingConfig } from "@/lib/booking";
 
 // ----------------------------------------------------------------------------
 // VAPI
@@ -61,6 +62,9 @@ export interface CalendarAdapter {
     rangeStart: Date;
     rangeEnd: Date;
     slotMinutes: number;
+    // Per-business hours/timezone. When set, only slots inside the open
+    // windows are returned. Defaults applied by the caller when omitted.
+    businessHours?: BookingConfig;
   }): Promise<CalendarSlot[]>;
 
   /** Create an event on a specific calendar. */

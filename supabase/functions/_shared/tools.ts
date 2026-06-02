@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { adapters } from "./adapters.ts";
+import { adapters, normalizeBookingConfig } from "./adapters.ts";
 
 // Deno twin of apps/web/lib/tools — same shapes, same DB writes.
 // Kept side-by-side because Deno can't reach the Next.js workspace.
@@ -21,11 +21,16 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
     const rangeStart = new Date(dr.start);
     const rangeEnd   = new Date(dr.end);
 
+    const { data: tenantRow } = await ctx.supabase
+      .from("tenants").select("booking_config").eq("id", ctx.tenantId).maybeSingle();
+    const cfg = normalizeBookingConfig(tenantRow?.booking_config);
+
     let q = ctx.supabase
       .from("staff")
       .select("id, name, google_calendar_id, role")
       .eq("tenant_id", ctx.tenantId)
       .eq("is_active", true)
+      .eq("is_bookable", true)
       .not("google_calendar_id", "is", null);
     if (input.staff_role) q = q.eq("role", input.staff_role as string);
     if (input.staff_id)   q = q.eq("id", input.staff_id as string);
@@ -39,7 +44,8 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
       staffCalendarIds: staff.map((s: { id: string; google_calendar_id: string }) =>
         ({ staff_id: s.id, calendar_id: s.google_calendar_id })),
       rangeStart, rangeEnd,
-      slotMinutes: (input.slot_minutes as number | undefined) ?? 15,
+      slotMinutes: cfg.slotMinutes,
+      businessHours: cfg,
     });
     const nameById = new Map(staff.map((s: { id: string; name: string }) => [s.id, s.name]));
     return {
@@ -57,6 +63,7 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
       .select("id, name, google_calendar_id")
       .eq("tenant_id", ctx.tenantId)
       .eq("is_active", true)
+      .eq("is_bookable", true)
       .not("google_calendar_id", "is", null)
       .limit(1);
     if (input.staff_id)        q = q.eq("id", input.staff_id as string);

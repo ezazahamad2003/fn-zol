@@ -7,10 +7,11 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/constants";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Calls" },
-  { href: "/tasks",     label: "Tasks" },
-  { href: "/messages",  label: "Messages" },
-  { href: "/settings",  label: "Settings" },
+  { href: "/dashboard",    label: "Calls" },
+  { href: "/appointments", label: "Appointments" },
+  { href: "/tasks",        label: "Tasks" },
+  { href: "/messages",     label: "Messages" },
+  { href: "/settings",     label: "Settings" },
 ];
 
 export type NavTenant = { id: string; name: string };

@@ -1,5 +1,6 @@
 import type { CalendarAdapter, CalendarSlot, CalendarEvent } from "@/lib/adapters/types";
 import { getValidAccessToken } from "@/lib/google/oauth";
+import { DEFAULT_BOOKING_CONFIG, isSlotWithinHours } from "@/lib/booking";
 
 // Real Google Calendar adapter. Uses the per-tenant OAuth token (see
 // lib/google/oauth.ts). findOpenSlots derives free windows from the freeBusy
@@ -24,6 +25,9 @@ export const calendarReal: CalendarAdapter = {
     const tenantId = input.tenant.id;
     if (input.staffCalendarIds.length === 0) return [];
 
+    const cfg = input.businessHours ?? DEFAULT_BOOKING_CONFIG;
+    const slotMs = cfg.slotMinutes * 60_000;
+
     const fb = await googleFetch(tenantId, "/freeBusy", {
       method: "POST",
       body: JSON.stringify({
@@ -33,19 +37,15 @@ export const calendarReal: CalendarAdapter = {
       }),
     });
 
-    const slotMs = input.slotMinutes * 60_000;
     const out: CalendarSlot[] = [];
-
     for (const { staff_id, calendar_id } of input.staffCalendarIds) {
       const busy: { start: string; end: string }[] = fb?.calendars?.[calendar_id]?.busy ?? [];
-      // Walk the window in slot steps; offer a slot if it overlaps no busy block
-      // and falls in business hours (9–17, Mon–Fri).
+      // Walk the window in slot steps; offer a slot if it's inside the
+      // business's open hours (in their timezone) and overlaps no busy block.
       for (let t = ceilToSlot(input.rangeStart, slotMs); t + slotMs <= input.rangeEnd.getTime(); t += slotMs) {
         const start = new Date(t);
         const end = new Date(t + slotMs);
-        const hour = start.getHours();
-        const day = start.getDay();
-        if (hour < 9 || hour >= 17 || day === 0 || day === 6) continue;
+        if (!isSlotWithinHours(start, cfg)) continue;
         const overlaps = busy.some((b) => new Date(b.start).getTime() < end.getTime() && new Date(b.end).getTime() > start.getTime());
         if (overlaps) continue;
         out.push({ start: start.toISOString(), end: end.toISOString(), staff_id });

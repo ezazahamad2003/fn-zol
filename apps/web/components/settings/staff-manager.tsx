@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Inpu
 import { upsertStaff, setStaffActive } from "@/app/(dashboard)/settings/actions";
 import type { Staff } from "@/lib/db/types";
 
-const EMPTY = { id: undefined as string | undefined, name: "", role: "", phone: "", email: "", googleCalendarId: "" };
+const EMPTY = { id: undefined as string | undefined, name: "", role: "", phone: "", email: "", googleCalendarId: "", isBookable: true };
 
 export function StaffManager({ staff }: { staff: Staff[] }) {
   const router = useRouter();
@@ -19,6 +19,7 @@ export function StaffManager({ staff }: { staff: Staff[] }) {
     setForm({
       id: s.id, name: s.name, role: s.role,
       phone: s.phone ?? "", email: s.email ?? "", googleCalendarId: s.google_calendar_id ?? "",
+      isBookable: s.is_bookable,
     });
   }
 
@@ -53,6 +54,7 @@ export function StaffManager({ staff }: { staff: Staff[] }) {
                 <th className="text-left font-medium py-2">Role</th>
                 <th className="text-left font-medium py-2">Phone</th>
                 <th className="text-left font-medium py-2">Calendar</th>
+                <th className="text-left font-medium py-2">Bookable</th>
                 <th className="text-left font-medium py-2">Active</th>
                 <th></th>
               </tr>
@@ -64,6 +66,7 @@ export function StaffManager({ staff }: { staff: Staff[] }) {
                   <td className="py-2 capitalize">{s.role}</td>
                   <td className="py-2 font-mono text-xs">{s.phone ?? "—"}</td>
                   <td className="py-2 font-mono text-xs truncate max-w-[160px]">{s.google_calendar_id ?? "—"}</td>
+                  <td className="py-2">{s.is_bookable ? <Badge variant="success">yes</Badge> : <Badge variant="muted">no</Badge>}</td>
                   <td className="py-2">{s.is_active ? <Badge variant="success">on</Badge> : <Badge variant="muted">off</Badge>}</td>
                   <td className="py-2 text-right whitespace-nowrap">
                     <Button size="sm" variant="ghost" onClick={() => edit(s)}>Edit</Button>
@@ -84,6 +87,10 @@ export function StaffManager({ staff }: { staff: Staff[] }) {
             <Field label="Email" v={form.email} onChange={(v) => setForm({ ...form, email: v })} />
             <Field label="Google calendar id" v={form.googleCalendarId} onChange={(v) => setForm({ ...form, googleCalendarId: v })} placeholder="person@company.com" />
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.isBookable} onChange={(e) => setForm({ ...form, isBookable: e.target.checked })} />
+            Available for appointment booking
+          </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : form.id ? "Update" : "Add"}</Button>

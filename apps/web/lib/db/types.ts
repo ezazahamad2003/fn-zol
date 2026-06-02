@@ -12,6 +12,8 @@ export type Tenant = {
   system_prompt: string | null;
   first_message: string | null;
   voice_config: Record<string, unknown>;
+  booking_config: Record<string, unknown>;
+  routing_rules: { intent: string; role: string }[];
   created_at: string;
 };
 
@@ -24,6 +26,7 @@ export type Staff = {
   email: string | null;
   google_calendar_id: string | null;
   is_active: boolean;
+  is_bookable: boolean;
   created_at: string;
 };
 
