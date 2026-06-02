@@ -33,3 +33,6 @@ Thumbs.db
 
 # coverage
 coverage/
+
+# deno (tests run with lock disabled; no root lockfile needed)
+deno.lock

@@ -30,9 +30,9 @@ export async function resolveTenant(
 export async function upsertCall(
   supabase: SupabaseClient,
   args: { tenantId: string; vapiCallId: string; callerNumber?: string | null },
-): Promise<{ id: string }> {
+): Promise<{ id: string; status: string }> {
   const { data: existing } = await supabase
-    .from("calls").select("id").eq("vapi_call_id", args.vapiCallId).maybeSingle();
+    .from("calls").select("id, status").eq("vapi_call_id", args.vapiCallId).maybeSingle();
   if (existing) return existing;
 
   const { data, error } = await supabase
@@ -43,7 +43,7 @@ export async function upsertCall(
       caller_number: args.callerNumber ?? null,
       status:        "in_progress",
     })
-    .select("id")
+    .select("id, status")
     .single();
   if (error) throw error;
   return data;

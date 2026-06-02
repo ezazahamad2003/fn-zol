@@ -6,13 +6,16 @@
 // setting USE_STUBS=false and implementing the model real adapter.
 // =============================================================================
 
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handlePreflight, corsHeaders } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase.ts";
 import { resolveTenant, upsertCall } from "../_shared/tenant.ts";
 import { extractTasks } from "../_shared/model.ts";
 import { verifyVapiSecret } from "../_shared/auth.ts";
 
-Deno.serve(async (req) => {
+// Handler is exported (with the Supabase client injected) so tests can drive it
+// with a mock DB. Deno.serve wires the real admin client in production.
+export async function handleEndOfCall(req: Request, supabase: SupabaseClient): Promise<Response> {
   const pre = handlePreflight(req); if (pre) return pre;
   if (!verifyVapiSecret(req)) return json({ error: "unauthorized" }, 401);
 
@@ -33,7 +36,6 @@ Deno.serve(async (req) => {
   const startedAt    = message.startedAt as string | undefined;
   const endedAt      = message.endedAt   as string | undefined;
 
-  const supabase = supabaseAdmin();
   const tenant = await resolveTenant(supabase, {
     assistantId: assistant?.id ?? null,
     phoneId:     phoneNumber?.id ?? null,
@@ -57,22 +59,38 @@ Deno.serve(async (req) => {
   };
   if (startedAt) update.started_at = startedAt;
 
-  const { error: updErr } = await supabase.from("calls").update(update).eq("id", callRow.id);
+  // Idempotency via compare-and-swap: VAPI retries this webhook on timeout.
+  // Only the request that flips the call from not-completed → completed wins;
+  // retries match zero rows and bail before extracting tasks, so we never
+  // create duplicate tasks. Marking completed first is deliberate — a rare
+  // lost task on a later failure is preferable to duplicates the owner sees.
+  const { data: claimed, error: updErr } = await supabase
+    .from("calls").update(update)
+    .eq("id", callRow.id).neq("status", "completed")
+    .select("id");
   if (updErr) return json({ error: "update_failed", detail: updErr.message }, 500);
+  if (!claimed || claimed.length === 0) {
+    return json({ ok: true, call_id: callRow.id, tasks_created: 0, idempotent: true });
+  }
 
-  // ----- task extraction (Claude, with a regex fallback) -----
+  // ----- task extraction (OpenAI, with a regex fallback) -----
   const tasks = await extractTasks(transcript ?? "", summary);
   if (tasks.length > 0) {
-    await supabase.from("tasks").insert(tasks.map((t) => ({
+    const { error: taskErr } = await supabase.from("tasks").insert(tasks.map((t) => ({
       tenant_id:   tenant.id,
       call_id:     callRow.id,
       title:       t.title,
       description: t.description ?? null,
     })));
+    if (taskErr) return json({ error: "task_insert_failed", detail: taskErr.message }, 500);
   }
 
   return json({ ok: true, call_id: callRow.id, tasks_created: tasks.length });
-});
+}
+
+// Only bind the server when run as the entrypoint (production); stays inert
+// when imported by tests.
+if (import.meta.main) Deno.serve((req) => handleEndOfCall(req, supabaseAdmin()));
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
