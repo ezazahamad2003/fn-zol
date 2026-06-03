@@ -23,6 +23,7 @@ export default function OnboardingPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ phone: string | null } | null>(null);
+  const canRetryInSettings = error?.startsWith("Business created, but provisioning");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -105,7 +106,16 @@ export default function OnboardingPage() {
               <p className="text-[11px] text-muted-foreground">You can keep editing this later in Settings.</p>
             </div>
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && (
+              <div className="space-y-2">
+                <p className="text-xs text-red-600">{error}</p>
+                {canRetryInSettings && (
+                  <Button type="button" variant="outline" className="w-full" onClick={() => router.push("/settings")}>
+                    Open settings to retry
+                  </Button>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Creating your agent…" : "Create agent & get my number"}
             </Button>

@@ -35,7 +35,7 @@ What you don't do:
 - You don't share internal info about staff schedules.
 
 End every call with a clear next step and who's handling it.$$,
-  '{"voice": "shimmer", "speed": 1.0, "interruption_threshold": 0.6}'::jsonb
+  '{"voice": "shimmer", "interruption_threshold": 0.6}'::jsonb
 );
 
 -- FNS staff

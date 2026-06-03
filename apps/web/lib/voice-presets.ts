@@ -18,25 +18,25 @@ export const VOICE_PRESETS: VoicePreset[] = [
     id: "11labs-paige",
     label: "Paige — warm, professional (ElevenLabs)",
     description: "Friendly female front-desk voice. Most human-sounding.",
-    voice: { provider: "11labs", voiceId: "56AoDkrOh6qfVPDXZ7Pt", model: "eleven_flash_v2_5", speed: 1.0 },
+    voice: { provider: "11labs", voiceId: "56AoDkrOh6qfVPDXZ7Pt", model: "eleven_flash_v2_5" },
   },
   {
     id: "11labs-cody",
     label: "Cody — friendly, upbeat (ElevenLabs)",
     description: "Approachable male voice with natural energy.",
-    voice: { provider: "11labs", voiceId: "31vbP374tCzj6r8RPysS", model: "eleven_flash_v2_5", speed: 1.0 },
+    voice: { provider: "11labs", voiceId: "31vbP374tCzj6r8RPysS", model: "eleven_flash_v2_5" },
   },
   {
     id: "cartesia-sonic-female",
     label: "Sage — crisp, fast (Cartesia)",
     description: "Lowest latency. Clear, calm female voice.",
-    voice: { provider: "cartesia", voiceId: "a0e99841-438c-4a64-b679-ae501e7d6091", model: "sonic-2", speed: 1.0 },
+    voice: { provider: "cartesia", voiceId: "a0e99841-438c-4a64-b679-ae501e7d6091", model: "sonic-2" },
   },
   {
     id: "cartesia-sonic-male",
     label: "Ridge — confident, fast (Cartesia)",
     description: "Lowest latency. Grounded, confident male voice.",
-    voice: { provider: "cartesia", voiceId: "729651dc-c6c3-4ee5-97fa-350da1f88600", model: "sonic-2", speed: 1.0 },
+    voice: { provider: "cartesia", voiceId: "729651dc-c6c3-4ee5-97fa-350da1f88600", model: "sonic-2" },
   },
 ];
 

@@ -42,7 +42,6 @@ function voiceBlock(voice: VapiVoice) {
     provider: voice.provider,
     voiceId: voice.voiceId,
     ...(voice.model ? { model: voice.model } : {}),
-    ...(typeof voice.speed === "number" ? { speed: voice.speed } : {}),
   };
 }
 

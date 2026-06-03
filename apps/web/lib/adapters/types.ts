@@ -11,7 +11,6 @@ export type VapiVoice = {
   provider: string;   // "11labs" | "cartesia" | ...
   voiceId: string;
   model?: string;
-  speed?: number;
 };
 
 export type VapiAssistantConfig = {

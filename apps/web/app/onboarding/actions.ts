@@ -37,6 +37,12 @@ function randomSuffix(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function setActiveTenant(tenantId: string) {
+  cookies().set(ACTIVE_TENANT_COOKIE, tenantId, {
+    path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax",
+  });
+}
+
 export async function createBusiness(form: {
   name: string;
   systemPrompt: string;
@@ -99,6 +105,7 @@ export async function createBusiness(form: {
     logError("onboarding.provision", err, { tenantId: tenant.id, name });
     // Tenant exists but provisioning failed — surface it; the user can retry
     // provisioning from settings. Don't leave them stranded with no business.
+    setActiveTenant(tenant.id);
     return { ok: false, error: `Business created, but provisioning the phone number failed: ${message}` };
   }
 
@@ -115,9 +122,7 @@ export async function createBusiness(form: {
   if (updErr) return { ok: false, error: `Provisioned, but saving the number failed: ${updErr.message}` };
 
   // 4. Make this the active business for the dashboard.
-  cookies().set(ACTIVE_TENANT_COOKIE, tenant.id, {
-    path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax",
-  });
+  setActiveTenant(tenant.id);
 
   return { ok: true, tenantId: tenant.id, phoneNumber: provisioned.vapi_phone_number };
 }

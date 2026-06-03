@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
 import { adapters } from "@/lib/adapters";
 import { voiceForPreset } from "@/lib/voice-presets";
@@ -10,6 +10,46 @@ import { normalizeBookingConfig, type BookingConfig } from "@/lib/booking";
 import type { Tenant } from "@/lib/db/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+export async function provisionPhoneLine(): Promise<ActionResult> {
+  const tenant = await getActiveTenant();
+  if (!tenant) return { ok: false, error: "No active business." };
+  if (tenant.vapi_assistant_id && tenant.vapi_phone_number && tenant.vapi_phone_id) {
+    return { ok: true };
+  }
+
+  const voice = voiceForPreset((tenant.voice_config?.preset as string | undefined) ?? null);
+  let provisioned;
+  try {
+    provisioned = await adapters.vapi.provisionTenant({
+      name: tenant.name,
+      model: tenant.model,
+      firstMessage: tenant.first_message ?? undefined,
+      voice,
+      systemPrompt: composeSystemPrompt({
+        systemPrompt: tenant.system_prompt,
+        bookingConfig: tenant.booking_config,
+        routingRules: tenant.routing_rules,
+      }),
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  const { error } = await supabaseAdmin()
+    .from("tenants")
+    .update({
+      vapi_assistant_id: provisioned.vapi_assistant_id,
+      vapi_phone_number: provisioned.vapi_phone_number,
+      vapi_phone_id: provisioned.vapi_phone_id,
+    })
+    .eq("id", tenant.id);
+  if (error) return { ok: false, error: `Provisioned, but saving the number failed: ${error.message}` };
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
 
 // Push the full assistant config to VAPI with a freshly-composed prompt
 // (base personality + routing rules + booking hours). No-op in stub mode.

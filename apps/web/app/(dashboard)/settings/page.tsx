@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Button, EmptyState } from "@/components/ui/primitives";
 import { DevTriggerPanel } from "@/components/dev-trigger-panel";
+import { PhoneLineCard } from "@/components/settings/phone-line-card";
 import { AgentForm } from "@/components/settings/agent-form";
 import { StaffManager } from "@/components/settings/staff-manager";
 import { BookingForm } from "@/components/settings/booking-form";
@@ -37,18 +38,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
         <p className="text-xs text-muted-foreground">Your agent's personality, voice, and staff routing.</p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Phone line</CardTitle>
-          <CardDescription>Provisioned at onboarding. Callers reach your agent here.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <KV k="Business"          v={tenant.name} />
-          <KV k="Inbound number"    v={tenant.vapi_phone_number ?? "(not provisioned)"} />
-          <KV k="VAPI assistant id" v={tenant.vapi_assistant_id ?? "(not provisioned)"} />
-          <KV k="VAPI phone id"     v={tenant.vapi_phone_id ?? "(not provisioned)"} />
-        </CardContent>
-      </Card>
+      <PhoneLineCard
+        businessName={tenant.name}
+        phoneNumber={tenant.vapi_phone_number}
+        assistantId={tenant.vapi_assistant_id}
+        phoneId={tenant.vapi_phone_id}
+      />
 
       <Card>
         <CardHeader>
@@ -96,15 +91,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
       <RoutingForm rules={routingRules} roles={roles} />
 
       <DevTriggerPanel tenantId={tenant.id} staff={list.map((s) => ({ id: s.id, name: s.name, role: s.role }))} />
-    </div>
-  );
-}
-
-function KV({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{k}</div>
-      <div className="font-mono text-xs break-all">{v}</div>
     </div>
   );
 }

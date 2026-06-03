@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 // Routes that require an authenticated session. The dashboard route-group
 // segments don't appear in the URL, so we list their real paths plus onboarding.
@@ -7,6 +8,13 @@ const PROTECTED = ["/dashboard", "/calls", "/tasks", "/messages", "/settings", "
 const AUTH_PAGES = ["/login", "/signup"];
 
 export async function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === "/" && req.nextUrl.searchParams.has("code")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    url.searchParams.set("next", safeRedirectPath(url.searchParams.get("next"), "/onboarding"));
+    return NextResponse.redirect(url);
+  }
+
   // Response we can write refreshed auth cookies onto.
   let res = NextResponse.next({ request: { headers: req.headers } });
 
