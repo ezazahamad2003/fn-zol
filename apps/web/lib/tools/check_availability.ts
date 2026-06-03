@@ -8,6 +8,15 @@ import { normalizeBookingConfig, type BookingConfig } from "@/lib/booking";
 export const PRIMARY_CALENDAR_STAFF_ID = "primary";
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WEEKDAYS: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
 
 function timezoneOffsetMs(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -42,9 +51,50 @@ function zonedDateToUtc(date: string, time: "00:00:00" | "23:59:59", timeZone: s
   return new Date(guess.getTime() - timezoneOffsetMs(guess, timeZone));
 }
 
+function zonedToday(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10);
+}
+
+function relativeDate(raw: string, timeZone: string): string | null {
+  const value = raw.toLowerCase().trim();
+  const today = zonedToday(timeZone);
+  if (value === "today" || value.includes("today")) return today;
+  if (value.includes("day after tomorrow")) return addDays(today, 2);
+  if (value === "tomorrow" || value.includes("tomorrow")) return addDays(today, 1);
+
+  const weekday = Object.entries(WEEKDAYS).find(([name]) => value.includes(name));
+  if (!weekday) return null;
+  const [year, month, day] = today.split("-").map(Number);
+  const currentDow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  let delta = (weekday[1] - currentDow + 7) % 7;
+  if (delta === 0 || value.includes("next ")) delta += 7;
+  return addDays(today, delta);
+}
+
+function parseDateBoundary(raw: string, boundary: "start" | "end", cfg: BookingConfig): Date {
+  const date = DATE_ONLY_RE.test(raw) ? raw : relativeDate(raw, cfg.timezone);
+  if (date) {
+    return zonedDateToUtc(date, boundary === "start" ? "00:00:00" : "23:59:59", cfg.timezone);
+  }
+  return new Date(raw);
+}
+
 function parseRange(raw: { start: string; end: string }, cfg: BookingConfig): { rangeStart: Date; rangeEnd: Date } {
-  const rangeStart = DATE_ONLY_RE.test(raw.start) ? zonedDateToUtc(raw.start, "00:00:00", cfg.timezone) : new Date(raw.start);
-  let rangeEnd = DATE_ONLY_RE.test(raw.end) ? zonedDateToUtc(raw.end, "23:59:59", cfg.timezone) : new Date(raw.end);
+  const rangeStart = parseDateBoundary(raw.start, "start", cfg);
+  let rangeEnd = parseDateBoundary(raw.end, "end", cfg);
   if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) {
     throw new Error("check_availability: invalid date_range; use ISO dates or datetimes");
   }

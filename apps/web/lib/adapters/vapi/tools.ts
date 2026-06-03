@@ -32,11 +32,11 @@ export function buildVapiTools(toolWebhookUrl: string, secret?: string): VapiToo
   return [
     fn(
       "check_availability",
-      "Find open appointment slots before offering times to the caller.",
+      "Find open appointment slots before offering times to the caller. Relative dates like 'today', 'tomorrow', and 'next Friday' are accepted and resolved in the business timezone.",
       {
         date_range: {
           type: "object",
-          description: "ISO start/end of the window to search.",
+          description: "Start/end of the window to search. Prefer ISO dates or datetimes; relative phrases like 'tomorrow' are allowed.",
           properties: { start: { type: "string" }, end: { type: "string" } },
           required: ["start", "end"],
         },
@@ -48,7 +48,7 @@ export function buildVapiTools(toolWebhookUrl: string, secret?: string): VapiToo
     ),
     fn(
       "book_appointment",
-      "Book an appointment on the calendar once the caller has chosen a time.",
+      "Book an appointment on the calendar once the caller has chosen a time. Use a start time from check_availability when possible.",
       {
         customer_name: { type: "string" },
         customer_phone: { type: "string" },
