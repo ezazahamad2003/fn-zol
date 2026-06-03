@@ -12,42 +12,91 @@ export type ToolName =
   | "create_task";
 
 type Ctx = { supabase: SupabaseClient; tenantId: string; callId: string };
+const PRIMARY_CALENDAR_STAFF_ID = "primary";
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function timezoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  let hour = Number(get("hour"));
+  if (hour === 24) hour = 0;
+  const asUtc = Date.UTC(
+    Number(get("year")),
+    Number(get("month")) - 1,
+    Number(get("day")),
+    hour,
+    Number(get("minute")),
+    Number(get("second")),
+  );
+  return asUtc - date.getTime();
+}
+
+function zonedDateToUtc(date: string, time: "00:00:00" | "23:59:59", timeZone: string): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute, second] = time.split(":").map(Number);
+  let guess = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  guess = new Date(guess.getTime() - timezoneOffsetMs(guess, timeZone));
+  return new Date(guess.getTime() - timezoneOffsetMs(guess, timeZone));
+}
+
+function parseAvailabilityRange(raw: { start?: string; end?: string }, cfg: { timezone: string }) {
+  if (!raw.start || !raw.end) throw new Error("check_availability: invalid date_range");
+  const rangeStart = DATE_ONLY_RE.test(raw.start) ? zonedDateToUtc(raw.start, "00:00:00", cfg.timezone) : new Date(raw.start);
+  let rangeEnd = DATE_ONLY_RE.test(raw.end) ? zonedDateToUtc(raw.end, "23:59:59", cfg.timezone) : new Date(raw.end);
+  if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) {
+    throw new Error("check_availability: invalid date_range; use ISO dates or datetimes");
+  }
+  if (rangeEnd <= rangeStart) rangeEnd = new Date(rangeStart.getTime() + 24 * 60 * 60_000);
+  return { rangeStart, rangeEnd };
+}
 
 const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<unknown>> = {
   // -----------------------------------------------------------------
   async check_availability(ctx, input) {
     const dr = (input.date_range ?? {}) as { start?: string; end?: string };
-    if (!dr.start || !dr.end) throw new Error("check_availability: invalid date_range");
-    const rangeStart = new Date(dr.start);
-    const rangeEnd   = new Date(dr.end);
-
     const { data: tenantRow } = await ctx.supabase
       .from("tenants").select("booking_config").eq("id", ctx.tenantId).maybeSingle();
     const cfg = normalizeBookingConfig(tenantRow?.booking_config);
+    const { rangeStart, rangeEnd } = parseAvailabilityRange(dr, cfg);
 
     let q = ctx.supabase
       .from("staff")
       .select("id, name, google_calendar_id, role")
       .eq("tenant_id", ctx.tenantId)
       .eq("is_active", true)
-      .eq("is_bookable", true)
-      .not("google_calendar_id", "is", null);
+      .eq("is_bookable", true);
     if (input.staff_role) q = q.eq("role", input.staff_role as string);
-    if (input.staff_id)   q = q.eq("id", input.staff_id as string);
+    if (input.staff_id && input.staff_id !== PRIMARY_CALENDAR_STAFF_ID) q = q.eq("id", input.staff_id as string);
 
     const { data: staff, error } = await q;
     if (error) throw error;
-    if (!staff || staff.length === 0) return { slots: [] };
+    const staffRows = staff ?? [];
+    const staffWithCalendars = staffRows.filter((s: { google_calendar_id?: string | null }) => s.google_calendar_id);
+    const targets = staffWithCalendars.length > 0
+      ? staffWithCalendars.map((s: { id: string; name: string; google_calendar_id: string }) =>
+        ({ staff_id: s.id, staff_name: s.name, calendar_id: s.google_calendar_id }))
+      : staffRows.length > 0
+        ? [{ staff_id: staffRows[0].id, staff_name: staffRows[0].name, calendar_id: "primary" }]
+        : [{ staff_id: PRIMARY_CALENDAR_STAFF_ID, staff_name: "Primary calendar", calendar_id: "primary" }];
 
     const slots = await adapters.calendar.findOpenSlots({
       tenantId: ctx.tenantId,
-      staffCalendarIds: staff.map((s: { id: string; google_calendar_id: string }) =>
-        ({ staff_id: s.id, calendar_id: s.google_calendar_id })),
+      staffCalendarIds: targets.map((s: { staff_id: string; calendar_id: string }) =>
+        ({ staff_id: s.staff_id, calendar_id: s.calendar_id })),
       rangeStart, rangeEnd,
       slotMinutes: cfg.slotMinutes,
       businessHours: cfg,
     });
-    const nameById = new Map(staff.map((s: { id: string; name: string }) => [s.id, s.name]));
+    const nameById = new Map(targets.map((s: { staff_id: string; staff_name: string }) => [s.staff_id, s.staff_name]));
     return {
       slots: slots.map((s) => ({
         start: s.start, end: s.end, staff_id: s.staff_id,
@@ -64,15 +113,14 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
       .eq("tenant_id", ctx.tenantId)
       .eq("is_active", true)
       .eq("is_bookable", true)
-      .not("google_calendar_id", "is", null)
       .limit(1);
-    if (input.staff_id)        q = q.eq("id", input.staff_id as string);
+    if (input.staff_id && input.staff_id !== PRIMARY_CALENDAR_STAFF_ID) q = q.eq("id", input.staff_id as string);
     else if (input.staff_role) q = q.eq("role", input.staff_role as string);
 
     const { data: rows, error: e1 } = await q;
     if (e1) throw e1;
     const staff = rows?.[0];
-    if (!staff) throw new Error("book_appointment: no eligible staff member");
+    const calendarId = (staff?.google_calendar_id as string | null | undefined) ?? "primary";
 
     const start = new Date(input.start_at as string);
     const end   = input.end_at
@@ -81,7 +129,7 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
 
     const event = await adapters.calendar.createEvent({
       tenantId:   ctx.tenantId,
-      calendarId: staff.google_calendar_id as string,
+      calendarId,
       title:      `ZOL: ${(input.purpose as string) ?? "Appointment"} (${input.customer_name as string})`,
       description: [
         `Customer: ${input.customer_name}`,
@@ -96,7 +144,7 @@ const tools: Record<ToolName, (c: Ctx, i: Record<string, unknown>) => Promise<un
       .insert({
         tenant_id:       ctx.tenantId,
         call_id:         ctx.callId,
-        staff_id:        staff.id,
+        staff_id:        staff?.id ?? null,
         google_event_id: event.google_event_id,
         customer_name:   input.customer_name,
         customer_phone:  input.customer_phone ?? null,

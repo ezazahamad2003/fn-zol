@@ -3,6 +3,7 @@ import type {
   BookAppointmentOutput,
   ToolHandler,
 } from "@/lib/tools/types";
+import { PRIMARY_CALENDAR_STAFF_ID } from "@/lib/tools/check_availability";
 
 export const bookAppointment: ToolHandler<BookAppointmentInput, BookAppointmentOutput> = async (
   ctx,
@@ -15,15 +16,14 @@ export const bookAppointment: ToolHandler<BookAppointmentInput, BookAppointmentO
     .eq("tenant_id", ctx.tenantId)
     .eq("is_active", true)
     .eq("is_bookable", true)
-    .not("google_calendar_id", "is", null)
     .limit(1);
-  if (input.staff_id)        staffQuery = staffQuery.eq("id", input.staff_id);
+  if (input.staff_id && input.staff_id !== PRIMARY_CALENDAR_STAFF_ID) staffQuery = staffQuery.eq("id", input.staff_id);
   else if (input.staff_role) staffQuery = staffQuery.eq("role", input.staff_role);
 
   const { data: staffRows, error: staffErr } = await staffQuery;
   if (staffErr) throw staffErr;
   const staff = staffRows?.[0];
-  if (!staff) throw new Error("book_appointment: no eligible staff member found");
+  const calendarId = staff?.google_calendar_id ?? "primary";
 
   const start = new Date(input.start_at);
   if (isNaN(start.getTime())) throw new Error("book_appointment: invalid start_at");
@@ -31,7 +31,7 @@ export const bookAppointment: ToolHandler<BookAppointmentInput, BookAppointmentO
 
   const event = await ctx.adapters.calendar.createEvent({
     tenant:     { id: ctx.tenantId },
-    calendarId: staff.google_calendar_id!,
+    calendarId,
     title:      `ZOL: ${input.purpose ?? "Appointment"} (${input.customer_name})`,
     description: [
       `Customer: ${input.customer_name}`,
@@ -48,7 +48,7 @@ export const bookAppointment: ToolHandler<BookAppointmentInput, BookAppointmentO
     .insert({
       tenant_id:       ctx.tenantId,
       call_id:         ctx.callId,
-      staff_id:        staff.id,
+      staff_id:        staff?.id ?? null,
       google_event_id: event.google_event_id,
       customer_name:   input.customer_name,
       customer_phone:  input.customer_phone ?? null,
