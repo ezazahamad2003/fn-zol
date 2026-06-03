@@ -8,7 +8,9 @@ import type { Appointment, Staff } from "@/lib/db/types";
 export const dynamic = "force-dynamic";
 
 const STATUS_VARIANT: Record<string, "success" | "muted" | "danger"> = {
-  confirmed: "success", completed: "muted", cancelled: "danger",
+  confirmed: "success",
+  completed: "muted",
+  cancelled: "danger",
 };
 
 export default async function AppointmentsPage() {
@@ -24,47 +26,65 @@ export default async function AppointmentsPage() {
 
   const staffById = new Map((staff as Pick<Staff, "id" | "name">[] | null ?? []).map((s) => [s.id, s.name]));
   const list = (appts as Appointment[] | null ?? []);
+  const now = Date.now();
+  const upcoming = list.filter((a) => new Date(a.start_at).getTime() >= now && a.status === "confirmed").length;
 
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("en-US", {
-      timeZone: tz, weekday: "short", month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit",
+      timeZone: tz,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     }).format(new Date(iso));
 
   return (
-    <div className="p-6 space-y-4">
-      <header>
-        <h1 className="text-lg font-semibold">Appointments</h1>
-        <p className="text-xs text-muted-foreground">Booked by the agent on staff calendars · times in {tz}.</p>
+    <div className="p-6 lg:p-8 space-y-5 max-w-7xl">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Appointments</h1>
+          <p className="text-sm text-muted-foreground mt-1">Booked by the agent, shown in {tz}.</p>
+        </div>
       </header>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Metric label="Upcoming" value={upcoming} tone="success" />
+        <Metric label="Total booked" value={list.length} />
+        <Metric label="Timezone" value={0} text={tz.replace("America/", "")} />
+      </div>
+
       <Card>
-        <CardHeader><CardTitle>Upcoming &amp; past</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          {list.length === 0 ? <div className="p-4"><EmptyState title="No appointments yet." hint="They'll appear here when the agent books one." /></div> : (
+        <CardHeader>
+          <CardTitle>Schedule</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          {list.length === 0 ? (
+            <div className="p-4"><EmptyState title="No appointments yet." hint="They will appear here when the agent books one." /></div>
+          ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <thead className="border-b border-border bg-slate-50 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="text-left font-medium px-4 py-2">When</th>
-                  <th className="text-left font-medium px-4 py-2">Customer</th>
-                  <th className="text-left font-medium px-4 py-2">With</th>
-                  <th className="text-left font-medium px-4 py-2">Purpose</th>
-                  <th className="text-left font-medium px-4 py-2">Status</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="text-left font-medium px-4 py-3">When</th>
+                  <th className="text-left font-medium px-4 py-3">Customer</th>
+                  <th className="text-left font-medium px-4 py-3">Calendar</th>
+                  <th className="text-left font-medium px-4 py-3">Purpose</th>
+                  <th className="text-left font-medium px-4 py-3">Status</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {list.map((a) => (
-                  <tr key={a.id}>
-                    <td className="px-4 py-2 whitespace-nowrap">{fmt(a.start_at)}</td>
-                    <td className="px-4 py-2">
+                  <tr key={a.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 whitespace-nowrap">{fmt(a.start_at)}</td>
+                    <td className="px-4 py-3">
                       {a.customer_name}
                       {a.customer_phone && <span className="block text-[11px] text-muted-foreground font-mono">{a.customer_phone}</span>}
                     </td>
-                    <td className="px-4 py-2">{a.staff_id ? (staffById.get(a.staff_id) ?? "—") : "—"}</td>
-                    <td className="px-4 py-2">{a.purpose ?? "—"}</td>
-                    <td className="px-4 py-2"><Badge variant={STATUS_VARIANT[a.status] ?? "muted"}>{a.status}</Badge></td>
-                    <td className="px-4 py-2 text-right">{a.call_id && <Link href={`/calls/${a.call_id}`} className="underline text-xs">call</Link>}</td>
+                    <td className="px-4 py-3">{a.staff_id ? (staffById.get(a.staff_id) ?? "Staff calendar") : "Primary calendar"}</td>
+                    <td className="px-4 py-3 max-w-[360px]"><span className="line-clamp-1">{a.purpose ?? "-"}</span></td>
+                    <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[a.status] ?? "muted"}>{a.status}</Badge></td>
+                    <td className="px-4 py-3 text-right">{a.call_id && <Link href={`/calls/${a.call_id}`} className="underline text-xs">call</Link>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -72,6 +92,16 @@ export default async function AppointmentsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Metric({ label, value, tone = "default", text }: { label: string; value: number; tone?: "default" | "success"; text?: string }) {
+  const color = tone === "success" ? "text-emerald-700" : "text-slate-900";
+  return (
+    <div className="rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={`mt-2 text-2xl font-semibold tabular-nums ${color}`}>{text ?? value}</div>
     </div>
   );
 }

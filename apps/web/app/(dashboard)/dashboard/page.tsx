@@ -35,44 +35,58 @@ export default async function DashboardPage() {
     .limit(50);
 
   const list = (calls ?? []) as Call[];
+  const completed = list.filter((c) => c.status === "completed").length;
+  const active = list.filter((c) => c.status === "in_progress").length;
+  const failed = list.filter((c) => c.status === "failed").length;
 
   return (
-    <div className="p-6 space-y-4">
-      <header className="flex items-center justify-between">
+    <div className="p-6 lg:p-8 space-y-5 max-w-7xl">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Calls</h1>
-          <p className="text-xs text-muted-foreground">Most recent calls for {tenant.name}.</p>
+          <h1 className="text-2xl font-semibold">Calls</h1>
+          <p className="text-sm text-muted-foreground mt-1">Live call activity for {tenant.name}.</p>
         </div>
-        <div className="text-xs text-muted-foreground">
-          Inbound number:{" "}
-          <span className="font-mono">{tenant.vapi_phone_number ?? "(not provisioned)"}</span>
+        <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs text-muted-foreground shadow-sm">
+          <span>Inbound number</span>
+          <span className="ml-2 font-mono text-slate-900">{tenant.vapi_phone_number ?? "(not provisioned)"}</span>
         </div>
       </header>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Metric label="Total calls" value={list.length} />
+        <Metric label="Completed" value={completed} tone="success" />
+        <Metric label="Needs attention" value={active + failed} tone={active + failed > 0 ? "warning" : "muted"} />
+      </div>
+
       <Card>
-        <CardHeader><CardTitle>Recent</CardTitle></CardHeader>
-        <CardContent className="p-0">
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Recent calls</CardTitle>
+            <p className="text-xs text-muted-foreground">Latest 50 conversations and outcomes.</p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
           {list.length === 0 ? (
-            <div className="p-6"><EmptyState title="No calls yet." hint="Trigger a tool from POST /api/dev/trigger or wait for VAPI to call in." /></div>
+            <div className="p-6"><EmptyState title="No calls yet." hint="Calls will appear here once VAPI sends events." /></div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <thead className="border-b border-border bg-slate-50 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="text-left font-medium px-4 py-2">When</th>
-                  <th className="text-left font-medium px-4 py-2">Caller</th>
-                  <th className="text-left font-medium px-4 py-2">Status</th>
-                  <th className="text-left font-medium px-4 py-2">Duration</th>
-                  <th className="text-left font-medium px-4 py-2">Summary</th>
+                  <th className="text-left font-medium px-4 py-3">When</th>
+                  <th className="text-left font-medium px-4 py-3">Caller</th>
+                  <th className="text-left font-medium px-4 py-3">Status</th>
+                  <th className="text-left font-medium px-4 py-3">Duration</th>
+                  <th className="text-left font-medium px-4 py-3">Summary</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {list.map((c) => (
-                  <tr key={c.id} className="hover:bg-muted/40">
-                    <td className="px-4 py-2 whitespace-nowrap tabular-nums text-xs text-muted-foreground">{relativeTime(c.started_at)}</td>
-                    <td className="px-4 py-2 whitespace-nowrap font-mono text-xs">{c.caller_number ?? "—"}</td>
-                    <td className="px-4 py-2"><Badge variant={statusVariant(c.status)}>{c.status}</Badge></td>
-                    <td className="px-4 py-2 whitespace-nowrap tabular-nums text-xs">{callDuration(c.started_at, c.ended_at)}</td>
-                    <td className="px-4 py-2 max-w-[480px]">
+                  <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-xs text-muted-foreground">{relativeTime(c.started_at)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{c.caller_number ?? "-"}</td>
+                    <td className="px-4 py-3"><Badge variant={statusVariant(c.status)}>{c.status}</Badge></td>
+                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-xs">{callDuration(c.started_at, c.ended_at)}</td>
+                    <td className="px-4 py-3 max-w-[520px]">
                       <Link href={`/calls/${c.id}`} className="hover:underline">
                         <span className="line-clamp-1">{c.summary ?? <span className="text-muted-foreground italic">(no summary)</span>}</span>
                       </Link>
@@ -84,6 +98,24 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "warning" | "muted" }) {
+  const dot = {
+    default: "bg-sky-500",
+    success: "bg-emerald-500",
+    warning: "bg-amber-500",
+    muted: "bg-slate-400",
+  }[tone];
+  return (
+    <div className="rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
     </div>
   );
 }

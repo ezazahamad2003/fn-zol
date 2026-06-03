@@ -32,10 +32,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
   const gFlash = searchParams?.google;
 
   return (
-    <div className="p-6 space-y-4 max-w-5xl">
-      <header>
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-xs text-muted-foreground">Your agent's personality, voice, and staff routing.</p>
+    <div className="p-6 lg:p-8 space-y-5 max-w-6xl">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="text-sm text-muted-foreground">Agent behavior, booking, and integrations for {tenant.name}.</p>
       </header>
 
       <PhoneLineCard
@@ -52,14 +52,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {!gConfigured ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs leading-5 text-muted-foreground">
               Calendar isn't configured on this deployment yet. Add the <code>GOOGLE_*</code> environment
               variables to enable it.
             </p>
           ) : gConn ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="success">connected</Badge>
-              <span className="text-muted-foreground">{gConn.google_email ?? "Google account linked"}</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="success">connected</Badge>
+                <span className="text-emerald-900">{gConn.google_email ?? "Google account linked"}</span>
+              </div>
               <a href="/api/google/connect"><Button size="sm" variant="outline">Reconnect</Button></a>
             </div>
           ) : (
@@ -71,7 +73,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { g
           )}
           {gFlash === "connected" && <p className="text-xs text-emerald-700">Google Calendar connected.</p>}
           <p className="text-[11px] text-muted-foreground">
-            Add each staff member's calendar id (their Google email) under Staff &amp; routing below.
+            If a staff calendar id is blank, the agent books on the connected Google account's primary calendar.
           </p>
         </CardContent>
       </Card>

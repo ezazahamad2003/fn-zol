@@ -13,7 +13,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const tenants = memberships.map((m) => ({ id: m.tenant.id, name: m.tenant.name }));
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-transparent">
       <Nav tenants={tenants} activeTenantId={active?.id ?? null} />
       <main className="flex-1 min-w-0">{children}</main>
     </div>

@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 html, body {
-  background-color: hsl(220 14% 98%);
+  min-height: 100%;
+  background:
+    linear-gradient(180deg, hsl(214 32% 98%) 0%, hsl(210 24% 96%) 48%, hsl(210 20% 95%) 100%);
   color: hsl(222 47% 11%);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: hsl(199 89% 48% / 0.18);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(220 13% 78%) transparent;
 }
