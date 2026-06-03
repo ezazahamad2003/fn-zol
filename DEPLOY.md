@@ -42,6 +42,8 @@ The webhook URLs are derived automatically from `NEXT_PUBLIC_SUPABASE_URL`:
 Set the env vars from `.env.local.example` in the Vercel project, with
 `USE_STUBS=false` and `NEXT_PUBLIC_APP_URL` = your domain. Auth, onboarding, and
 the dashboard are all server-rendered; the build is `pnpm --filter @zol/web build`.
+Set `VAPI_NUMBER_DESIRED_AREA_CODE` to the area code VAPI should try when
+provisioning hosted phone numbers.
 
 In the **Supabase dashboard → Auth**: set the Site URL + redirect URLs to your
 domain (including `https://<domain>/auth/callback`), and decide whether email

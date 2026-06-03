@@ -104,6 +104,7 @@ export const vapiReal: VapiAdapter = {
         provider: "vapi",
         name: `${input.name} — main line`,
         assistantId,
+        numberDesiredAreaCode: env.vapiNumberDesiredAreaCode(),
       }),
     });
     const phoneId = phone?.id as string | undefined;
