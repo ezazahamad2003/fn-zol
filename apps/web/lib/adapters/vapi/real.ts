@@ -45,6 +45,36 @@ function voiceBlock(voice: VapiVoice) {
   };
 }
 
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+async function createPhoneNumber(input: VapiAssistantConfig, assistantId: string): Promise<any> {
+  let lastError: unknown = null;
+  for (const areaCode of shuffled(env.vapiNumberDesiredAreaCodes())) {
+    try {
+      return await vapiFetch("/phone-number", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "vapi",
+          name: `${input.name} — main line`,
+          assistantId,
+          numberDesiredAreaCode: areaCode,
+        }),
+      });
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError ?? new Error("No VAPI area codes configured");
+}
+
 // The assistant payload. Tuned for ~500ms, natural turn-taking.
 function assistantPayload(input: VapiAssistantConfig) {
   const base = env.functionsBase();
@@ -98,15 +128,7 @@ export const vapiReal: VapiAdapter = {
     if (!assistantId) throw new Error("VAPI assistant create returned no id");
 
     // 2. Create a free VAPI phone number bound to the assistant.
-    const phone = await vapiFetch("/phone-number", {
-      method: "POST",
-      body: JSON.stringify({
-        provider: "vapi",
-        name: `${input.name} — main line`,
-        assistantId,
-        numberDesiredAreaCode: env.vapiNumberDesiredAreaCode(),
-      }),
-    });
+    const phone = await createPhoneNumber(input, assistantId);
     const phoneId = phone?.id as string | undefined;
     const phoneNumber = phone?.number as string | undefined;
     if (!phoneId || !phoneNumber) {
