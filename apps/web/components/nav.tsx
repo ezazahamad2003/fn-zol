@@ -36,7 +36,12 @@ export function Nav({ tenants, activeTenantId }: { tenants: NavTenant[]; activeT
     <aside className="w-64 shrink-0 border-r border-border/80 bg-white/90 min-h-screen flex flex-col shadow-[1px_0_0_hsl(220_13%_91%_/_0.4)]">
       <div className="px-4 py-5 border-b border-border/70">
         <div className="flex items-center gap-3 mb-5">
-          <div className="h-9 w-9 rounded-lg bg-slate-950 text-white flex items-center justify-center text-sm font-semibold">Z</div>
+          <img
+            alt=""
+            aria-hidden="true"
+            className="h-9 w-9 rounded-full object-cover shadow-sm ring-1 ring-black/5"
+            src="/zol-logo.png"
+          />
           <div>
             <div className="text-sm font-semibold">ZOL</div>
             <div className="text-[11px] text-muted-foreground">Voice operations</div>
